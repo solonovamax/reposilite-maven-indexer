@@ -1,0 +1,138 @@
+[versions]
+kotlin = "1.7.20"
+lucene = "9.4.2"
+dsiutils = "2.7.2"
+junit-jupiter = "5.9.1"
+shadow = "7.1.2"
+reposilite = "3.2.6"
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "kotlin" }
+
+grgit = { id = "org.ajoberstar.grgit.service", version = "5.0.0" }
+
+shadow = { id = "com.github.johnrengelman.shadow", version.ref = "shadow" }
+
+idea-ext = { id = "org.jetbrains.gradle.plugin.idea-ext", version = "1.1.6" }
+
+ksp = { id = "com.google.devtools.ksp", version = "1.7.20-1.0.8" }
+
+dokka = { id = "org.jetbrains.dokka", version.ref = "kotlin" }
+
+
+[libraries]
+
+# Kotlin stdlib
+kotlin-stdlib = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version.ref = "kotlin" }
+kotlin-stdlib-jdk7 = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib-jdk7", version.ref = "kotlin" }
+kotlin-stdlib-jdk8 = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib-jdk8", version.ref = "kotlin" }
+
+kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
+
+# Jetbrains Annotations
+## Annotations for documentation and static code analysis
+jetbrains-annotations = { group = "org.jetbrains", name = "annotations", version = "23.0.0" }
+
+# Reposilite
+##
+reposilite = { group = "com.reposilite", name = "reposilite", version.ref = "reposilite" }
+reposilite-backend = { group = "com.reposilite", name = "reposilite", version.ref = "reposilite" }
+reposilite-frontend = { group = "com.reposilite", name = "reposilite", version.ref = "reposilite" }
+reposilite-plugin-checksum = { group = "com.reposilite", name = "reposilite", version.ref = "reposilite" }
+reposilite-plugin-groovy = { group = "com.reposilite", name = "reposilite", version.ref = "reposilite" }
+reposilite-plugin-javadoc = { group = "com.reposilite", name = "reposilite", version.ref = "reposilite" }
+reposilite-plugin-swagger = { group = "com.reposilite", name = "reposilite", version.ref = "reposilite" }
+
+javalin-openapi-plugin = { group = "io.javalin.community.openapi", name = "javalin-openapi-plugin", version = "5.3.2-SNAPSHOT" }
+
+# Guava
+## A set of core Java libraries from Google that includes new collection types, immutable collections, a graph library,
+##      and utilities for concurrency, I/O, hashing, caching, primitives, strings, and more
+guava = { group = "com.google.guava", name = "guava", version = "31.1-jre" }
+# Guava Kotlin
+## A wrapper around Guava to make it more idiomatic in kotlin
+guava-kotlin = { group = "ca.solo-studios", name = "guava-kotlin", version = "0.1.0" }
+
+# Maven Indexer
+##
+maven-indexer = { group = "org.apache.maven.indexer", name = "indexer-core", version = "7.0.0" }
+
+# Apache Lucene
+## A Java library providing powerful indexing and search features, as well as spellchecking,
+##      hit highlighting and advanced analysis/tokenization capabilities
+lucene-core = { group = "org.apache.lucene", name = "lucene-core", version.ref = "lucene" }
+lucene-memory = { group = "org.apache.lucene", name = "lucene-memory", version.ref = "lucene" }
+#lucene-suggest = { group = "org.apache.lucene", name = "lucene-suggest", version.ref = "lucene" }
+lucene-sandbox = { group = "org.apache.lucene", name = "lucene-sandbox", version.ref = "lucene" }
+lucene-queries = { group = "org.apache.lucene", name = "lucene-queries", version.ref = "lucene" }
+lucene-queryparser = { group = "org.apache.lucene", name = "lucene-queryparser", version.ref = "lucene" }
+lucene-highlighter = { group = "org.apache.lucene", name = "lucene-highlighter", version.ref = "lucene" }
+lucene-analysis-common = { group = "org.apache.lucene", name = "lucene-analysis-common", version.ref = "lucene" }
+lucene-backward-codecs = { group = "org.apache.lucene", name = "lucene-backward-codecs", version.ref = "lucene" }
+
+# DSI Utilities
+## A mishmash of utility classes accumulated during the last twenty years in projects developed at the DSI
+#dsi-dsiutils = { group = "it.unimi.dsi", name = "dsiutils", version = "2.7.2" }
+# fastutil
+## fastutil extends the Java Collections Framework by providing type-specific maps, sets, lists and queues
+#dsi-fastutil = { group = "it.unimi.dsi", name = "fastutil", version = "8.5.9" }
+
+# Apache Commons
+#commons-compress = { group = "org.apache.commons", name = "commons-compress", version = "1.22" }
+#commons-io = { group = "org.apache.commons", name = "commons-io", version = "1.3.2" }
+#commons-codec = { group = "org.apache.commons", name = "commons-codec", version = "1.15" }
+#commons-codec = { group = "commons-codec", name = "commons-codec", version = "1.15" }
+#commons-math = { group = "org.apache.commons", name = "commons-math", version = "3.6.1" }
+# commons-math is being split into:
+# - commons-numbers
+# - commons-geometry
+# - commons-statistics
+# - commons-rng
+#commons-lang = { group = "org.apache.commons", name = "commons-lang3", version = "3.12.0" }
+#commons-text = { group = "org.apache.commons", name = "commons-text", version = "1.10.0" }
+
+# KSP Service Annotation
+## An annotation based generator for java the ServiceProvider META-INF configuration
+ksp-service = { group = "ca.solo-studios", name = "ksp-service-annotation", version = "1.0.3" }
+
+# JUnit
+## Unit testing framework for Java
+junit-jupiter-api = { group = "org.junit.jupiter", name = "junit-jupiter-api", version.ref = "junit-jupiter" }
+junit-jupiter-engine = { group = "org.junit.jupiter", name = "junit-jupiter-engine", version.ref = "junit-jupiter" }
+junit-jupiter-params = { group = "org.junit.jupiter", name = "junit-jupiter-params", version.ref = "junit-jupiter" }
+
+[bundles]
+kotlin-base = [
+    "kotlin-stdlib",
+    "kotlin-stdlib-jdk7",
+    "kotlin-stdlib-jdk8",
+]
+
+kotlin-test = [
+    "kotlin-test",
+]
+
+reposilite-plugins = [
+    "reposilite-plugin-checksum",
+    "reposilite-plugin-groovy",
+    "reposilite-plugin-javadoc",
+    "reposilite-plugin-swagger",
+]
+
+lucene = [
+    "lucene-core",
+    "lucene-memory",
+    "lucene-sandbox",
+    "lucene-queries",
+    "lucene-queryparser",
+    "lucene-highlighter",
+    "lucene-analysis-common",
+    "lucene-backward-codecs",
+]
+
+junit = [
+    "junit-jupiter-api",
+    "junit-jupiter-engine",
+    "junit-jupiter-params",
+]
