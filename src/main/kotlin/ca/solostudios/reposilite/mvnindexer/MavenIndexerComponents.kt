@@ -38,93 +38,93 @@ internal class MavenIndexerComponents(
     private val storageFacade: StorageFacade,
     private val mavenFacade: MavenFacade,
     private val mavenIndexerSettings: Reference<MavenIndexerSettings>
-                                     ) : PluginComponents {
+) : PluginComponents {
     private val indexPath = mavenIndexerSettings
-            .computed { it.indexPath ?: ".maven-index/" }
-            .computed { Path(it) }
-    
+        .computed { it.indexPath ?: ".maven-index/" }
+        .computed { Path(it) }
+
     private val indexCreators = listOf(
-            MinimalArtifactInfoIndexCreator(),
-            JarFileContentsIndexCreator(),
-            MavenArchetypeArtifactInfoIndexCreator(),
-            MavenPluginArtifactInfoIndexCreator(),
-            OsgiArtifactIndexCreator(),
-                                      ).associateBy { it.id }
-    
+        MinimalArtifactInfoIndexCreator(),
+        JarFileContentsIndexCreator(),
+        MavenArchetypeArtifactInfoIndexCreator(),
+        MavenPluginArtifactInfoIndexCreator(),
+        OsgiArtifactIndexCreator(),
+    ).associateBy { it.id }
+
     private fun searchEngine(): SearchEngine {
         return DefaultSearchEngine()
     }
-    
+
     private fun indexerEngine(): IndexerEngine {
         return DefaultIndexerEngine()
     }
-    
+
     private fun queryCreator(): QueryCreator {
         return DefaultQueryCreator()
     }
-    
+
     private fun mavenIndexer(): Indexer {
         return DefaultIndexer(
-                searchEngine(),
-                indexerEngine(),
-                queryCreator(),
-                             )
+            searchEngine(),
+            indexerEngine(),
+            queryCreator(),
+        )
     }
-    
+
     private fun Repository.indexPath() = indexPath.get().resolve(this.name)
-    
+
     private fun indexCreators(indexersString: String): List<IndexCreator> {
         return when (indexersString) {
             // full includes all index creators
             "full"    -> return indexCreators.values.toList()
             // default includes 'min' and 'jarContent' creators
             "default" -> return listOf(MinimalArtifactInfoIndexCreator(), JarFileContentsIndexCreator())
-            
+
             else      -> {
                 indexersString.split(',').mapNotNull { indexCreators[it] }
             }
         }
     }
-    
+
     internal fun indexingContext(
         repository: Repository,
         fsProvider: FileSystemStorageProvider,
         indexer: Indexer,
         settings: MavenIndexerSettings,
-                                ): IndexingContext {
+    ): IndexingContext {
         return indexer.createIndexingContext(
-                "${repository.name}-ctx",
-                repository.name,
-                fsProvider.rootDirectory.toFile(),
-                repository.indexPath().toFile(),
-                null,
-                null,
-                settings.searchable,
-                false,
-                indexCreators(settings.indexers),
-                                            )
+            "${repository.name}-ctx",
+            repository.name,
+            fsProvider.rootDirectory.toFile(),
+            repository.indexPath().toFile(),
+            null,
+            null,
+            settings.searchable,
+            false,
+            indexCreators(settings.indexers),
+        )
     }
-    
+
     private fun scheduler(): ScheduledThreadPoolExecutor = ScheduledThreadPoolExecutor(1, NamedThreadFactory("Maven Indexer (1) - "))
-    
+
     private fun mavenIndexerService(): MavenIndexerService =
-            MavenIndexerService(
-                    indexer = mavenIndexer(),
-                    journalist = journalist,
-                    mavenFacade = mavenFacade,
-                    failureFacade = failureFacade,
-                    storageFacade = storageFacade,
-                    mavenIndexerSettings = mavenIndexerSettings,
-                    components = this,
-                    scheduler = scheduler(),
-                               )
-    
+        MavenIndexerService(
+            indexer = mavenIndexer(),
+            journalist = journalist,
+            mavenFacade = mavenFacade,
+            failureFacade = failureFacade,
+            storageFacade = storageFacade,
+            mavenIndexerSettings = mavenIndexerSettings,
+            components = this,
+            scheduler = scheduler(),
+        )
+
     fun mavenIndexerFacade(
         mavenIndexerService: MavenIndexerService = mavenIndexerService(),
-                          ): MavenIndexerFacade =
-            MavenIndexerFacade(
-                    journalist = journalist,
-                    mavenFacade = mavenFacade,
-                    mavenIndexerService = mavenIndexerService,
-                              )
+    ): MavenIndexerFacade =
+        MavenIndexerFacade(
+            journalist = journalist,
+            mavenFacade = mavenFacade,
+            mavenIndexerService = mavenIndexerService,
+        )
 }

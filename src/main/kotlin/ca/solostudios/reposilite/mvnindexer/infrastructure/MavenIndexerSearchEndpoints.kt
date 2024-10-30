@@ -14,26 +14,26 @@ import panda.std.Result
 
 internal class MavenIndexerSearchEndpoints(
     private val mavenIndexerFacade: MavenIndexerFacade,
-                                          ) : MavenRoutes(mavenIndexerFacade.mavenFacade) {
+) : MavenRoutes(mavenIndexerFacade.mavenFacade) {
 
     @OpenApi(
-            tags = ["MavenIndexer"],
-            path = "/api/maven-indexer/{repository}/index",
-            methods = [HttpMethod.GET], // TODO: Change
-            pathParams = [
-                OpenApiParam(
-                        name = "repository", description = "Repository to index",
-                        required = true
-                            ),
-            ],
-            responses = [
-                OpenApiResponse(
-                        "200",
-                        content = [OpenApiContent(from = String::class, type = ContentType.PLAIN)],
-                        description = ""
-                               ),
-            ]
-            )
+        tags = ["MavenIndexer"],
+        path = "/api/maven-indexer/{repository}/index",
+        methods = [HttpMethod.GET], // TODO: Change
+        pathParams = [
+            OpenApiParam(
+                name = "repository", description = "Repository to index",
+                required = true
+            ),
+        ],
+        responses = [
+            OpenApiResponse(
+                "200",
+                content = [OpenApiContent(from = String::class, type = ContentType.PLAIN)],
+                description = ""
+            ),
+        ]
+    )
     private val index = ReposiliteRoute<Any>("/api/maven-indexer/{repository}/index", GET) {
 //        authorized { // TODO
         requireRepository { repository ->

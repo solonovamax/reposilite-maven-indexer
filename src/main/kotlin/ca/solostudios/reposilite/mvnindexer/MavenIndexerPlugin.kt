@@ -15,18 +15,18 @@ import com.reposilite.plugin.reposilite
 import com.reposilite.web.api.RoutingSetupEvent
 
 @Plugin(
-        name = "maven-indexer",
-        dependencies = [
-            "maven",
-            "failure",
-            "local-configuration",
-            "shared-configuration",
-            "access-token",
-            "storage"
-        ],
-        version = "0.0.0",
-        settings = MavenIndexerSettings::class,
-       )
+    name = "maven-indexer",
+    dependencies = [
+        "maven",
+        "failure",
+        "local-configuration",
+        "shared-configuration",
+        "access-token",
+        "storage"
+    ],
+    version = "0.0.0",
+    settings = MavenIndexerSettings::class,
+)
 @Service(ReposilitePlugin::class)
 public class MavenIndexerPlugin : ReposilitePlugin() {
     override fun initialize(): Facade {
@@ -35,25 +35,25 @@ public class MavenIndexerPlugin : ReposilitePlugin() {
             logger.info("--- Maven Indexer Plugin")
             logger.info("Maven indexer plugin loaded")
         }
-        
+
         val mavenIndexerFacade = MavenIndexerComponents(
-                reposilite = reposilite(),
-                parameters = parameters(),
-                journalist = this,
-                failureFacade = facade(),
-                storageFacade = facade(),
-                mavenFacade = facade(),
-                mavenIndexerSettings = facade<SharedConfigurationFacade>().getDomainSettings()
-                                                       )
-                .mavenIndexerFacade()
-        
-        
+            reposilite = reposilite(),
+            parameters = parameters(),
+            journalist = this,
+            failureFacade = facade(),
+            storageFacade = facade(),
+            mavenFacade = facade(),
+            mavenIndexerSettings = facade<SharedConfigurationFacade>().getDomainSettings()
+        )
+            .mavenIndexerFacade()
+
+
         event { event: RoutingSetupEvent ->
             event.registerRoutes(MavenIndexerApiEndpoints(mavenIndexerFacade))
             event.registerRoutes(MavenIndexerSearchEndpoints(mavenIndexerFacade))
         }
-        
+
         return mavenIndexerFacade
     }
-    
+
 }

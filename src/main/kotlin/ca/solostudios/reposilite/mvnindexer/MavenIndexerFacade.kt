@@ -11,12 +11,12 @@ public class MavenIndexerFacade internal constructor(
     public val journalist: Journalist,
     public val mavenFacade: MavenFacade,
     private val mavenIndexerService: MavenIndexerService,
-                                                    ) : Journalist, Facade {
+) : Journalist, Facade {
 
     public fun indexRepository(repository: Repository) {
         // TODO
     }
 
     override fun getLogger(): Logger =
-            journalist.logger
+        journalist.logger
 }

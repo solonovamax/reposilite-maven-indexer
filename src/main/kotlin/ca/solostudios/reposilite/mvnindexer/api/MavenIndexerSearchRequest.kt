@@ -7,4 +7,4 @@ public data class MavenIndexerSearchRequest(
     val accessToken: AccessTokenIdentifier?,
     val repository: Repository,
     val query: String,
-                                           )
+)

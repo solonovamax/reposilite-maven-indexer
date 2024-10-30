@@ -28,24 +28,33 @@ public data class MavenIndexerSettings(
     @get:Doc(title = "Legacy Index Format", description = "Build legacy .zip index file.")
     val legacy: Boolean = false,
     @get:Doc(
-            title = "Indexers",
-            description = """
+        title = "Indexers",
+        description = """
                 The indexers used to index the maven repository. Defaults to 'default'.
                 Comma separated list of indexers. Options: 'jarContent', 'maven-archetype', 'maven-plugin', 'min', and 'osgi-metadatas'.
                 Shortcuts: 'full' (All indexers), 'default' ('min' and 'jarContent')
             """,
-            )
+    )
     val indexers: String = "default",
     @get:Doc(
-            title = "Indexing interval",
-            description = """
+        title = "Indexing interval",
+        description = """
                 How often Reposilite should re-index the maven repository.
                 With smaller durations the index is updated sooner, but it'll increase drastically increase server load.
                 For smaller instances, this should ideally be kept low, but on more powerful servers it can be increased appropriately.
             """
-            )
+    )
     val mavenIndexInterval: MavenIndexInterval = DAILY,
-                                      ) : SharedSettings {
+) : SharedSettings {
+    public enum class MavenIndexer {
+        JAR_CONTENT,
+        MAVEN_ARCHETYPE,
+        MAVEN_PLUGIN,
+        MIN,
+        OSGI_METADATAS,
+        FULL,
+        DEFAULT,
+    }
     public enum class MavenIndexInterval(public val duration: Duration) {
         TWICE_HOURLY(30.minutes),
         HOURLY(1.hours),
@@ -54,7 +63,7 @@ public data class MavenIndexerSettings(
         WEEKLY(7.days),
         MONTHLY(30.days),
     }
-    
+
     private companion object {
         @Serial
         private const val serialVersionUID: Long = 5464972743493076525L

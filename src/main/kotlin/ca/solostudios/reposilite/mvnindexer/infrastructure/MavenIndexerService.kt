@@ -31,57 +31,57 @@ internal class MavenIndexerService(
     private val mavenIndexerSettings: Reference<MavenIndexerSettings>,
     private val components: MavenIndexerComponents,
     private val scheduler: ScheduledThreadPoolExecutor
-                                  ) : Journalist {
-    
+) : Journalist {
+
     private var indexerTask: ScheduledFuture<*>? = null
-    
+
     init {
         mavenIndexerSettings.subscribeDetailed(::settingsUpdate, true)
     }
-    
+
     private fun settingsUpdate(oldSettings: MavenIndexerSettings, newSettings: MavenIndexerSettings) {
         indexerTask?.cancel(false)
         scheduler.purge()
-        
+
         val durationMillis = newSettings.mavenIndexInterval.duration.toLong(MILLISECONDS)
         indexerTask = scheduler.scheduleAtFixedRate(::scheduledIndex, durationMillis, durationMillis, TimeUnit.MILLISECONDS)
     }
-    
+
     private fun scheduledIndex() {
         TODO("Process scheduled index")
     }
-    
+
     fun incrementalIndex(repository: Repository): Result<Unit, ErrorResponse> {
         if (repository.storageProvider !is FileSystemStorageProvider)
             return badRequestError("Repository must be located on the file system")
-        
+
         TODO("Incremental index")
     }
-    
+
     fun rebuildIndex(repository: Repository): Result<Unit, ErrorResponse> {
         if (repository.storageProvider !is FileSystemStorageProvider)
             return badRequestError("Repository must be located on the file system")
-        
+
         TODO("Rebuild index")
     }
-    
+
     private fun legacyWarning(settings: MavenIndexerSettings) {
         if (!settings.legacy)
             return
-        
+
         logger.warn("!!! Warning !!!")
         logger.warn("Using legacy .zip maven index format")
         logger.warn("It is recommended to not use the legacy index format.")
-        
+
     }
-    
+
     fun search(searchRequest: MavenIndexerSearchRequest): Result<MavenIndexerSearchResponse, ErrorResponse> {
         TODO("Finish search impl")
     }
-    
+
     fun contains(searchRequest: MavenIndexerSearchRequest): Result<Unit, ErrorResponse> {
         TODO("Finish search impl")
     }
-    
+
     override fun getLogger(): Logger = journalist.logger
 }
