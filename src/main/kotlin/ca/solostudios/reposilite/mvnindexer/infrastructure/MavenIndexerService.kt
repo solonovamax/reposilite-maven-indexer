@@ -8,17 +8,54 @@ import com.reposilite.journalist.Journalist
 import com.reposilite.journalist.Logger
 import com.reposilite.maven.MavenFacade
 import com.reposilite.maven.Repository
+import com.reposilite.maven.api.LookupRequest
+import com.reposilite.maven.api.PreResolveEvent
+import com.reposilite.maven.api.ResolvedDocument
+import com.reposilite.maven.api.ResolvedFileEvent
+import com.reposilite.plugin.Extensions
 import com.reposilite.shared.ErrorResponse
+import com.reposilite.shared.badRequest
 import com.reposilite.shared.badRequestError
+import com.reposilite.shared.notFound
+import com.reposilite.shared.notFoundError
 import com.reposilite.status.FailureFacade
 import com.reposilite.storage.StorageFacade
+import com.reposilite.storage.api.DocumentInfo
+import com.reposilite.storage.api.FileDetails
+import com.reposilite.storage.api.Location
 import com.reposilite.storage.filesystem.FileSystemStorageProvider
+import com.reposilite.token.AccessTokenIdentifier
+import io.javalin.http.ContentType
+import io.javalin.http.ContentType.APPLICATION_OCTET_STREAM
+import org.apache.lucene.index.MultiBits
+import org.apache.maven.index.ArtifactContext
+import org.apache.maven.index.ArtifactInfo
+import org.apache.maven.index.ArtifactScanningListener
 import org.apache.maven.index.Indexer
+import org.apache.maven.index.IteratorSearchRequest
+import org.apache.maven.index.NEXUS
+import org.apache.maven.index.ScanningResult
+import org.apache.maven.index.SearchType
+import org.apache.maven.index.artifact.VersionUtils
+import org.apache.maven.index.context.IndexUtils
+import org.apache.maven.index.context.IndexingContext
 import panda.std.Result
+import panda.std.asSuccess
+import panda.std.ok
 import panda.std.reactive.Reference
+import java.io.IOException
+import java.io.InputStream
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.attribute.BasicFileAttributes
+import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ScheduledFuture
-import java.util.concurrent.ScheduledThreadPoolExecutor
 import java.util.concurrent.TimeUnit
+import kotlin.io.path.exists
+import kotlin.io.path.extension
+import kotlin.io.path.isRegularFile
+import kotlin.io.path.name
+import kotlin.io.path.readAttributes
 import kotlin.time.DurationUnit.MILLISECONDS
 
 
@@ -28,51 +65,77 @@ internal class MavenIndexerService(
     private val mavenFacade: MavenFacade,
     private val failureFacade: FailureFacade,
     private val storageFacade: StorageFacade,
+    private val extensions: Extensions,
     private val mavenIndexerSettings: Reference<MavenIndexerSettings>,
     private val components: MavenIndexerComponents,
-    private val scheduler: ScheduledThreadPoolExecutor
 ) : Journalist {
-
-    private var indexerTask: ScheduledFuture<*>? = null
+    private var scheduler: ScheduledExecutorService = components.scheduler()
+    private lateinit var scheduledIndexingTask: ScheduledFuture<*>
 
     init {
         mavenIndexerSettings.subscribeDetailed(::settingsUpdate, true)
     }
 
     private fun settingsUpdate(oldSettings: MavenIndexerSettings, newSettings: MavenIndexerSettings) {
-        indexerTask?.cancel(false)
-        scheduler.purge()
+        if (::scheduledIndexingTask.isInitialized)
+            scheduledIndexingTask.cancel(false)
 
-        val durationMillis = newSettings.mavenIndexInterval.duration.toLong(MILLISECONDS)
-        indexerTask = scheduler.scheduleAtFixedRate(::scheduledIndex, durationMillis, durationMillis, TimeUnit.MILLISECONDS)
-    }
+        scheduler.apply {
+            shutdownNow()
+            close()
+        }
+        scheduler = components.scheduler()
 
-    private fun scheduledIndex() {
-        TODO("Process scheduled index")
-    }
-
-    fun incrementalIndex(repository: Repository): Result<Unit, ErrorResponse> {
-        if (repository.storageProvider !is FileSystemStorageProvider)
-            return badRequestError("Repository must be located on the file system")
-
-        TODO("Incremental index")
-    }
-
-    fun rebuildIndex(repository: Repository): Result<Unit, ErrorResponse> {
-        if (repository.storageProvider !is FileSystemStorageProvider)
-            return badRequestError("Repository must be located on the file system")
-
-        TODO("Rebuild index")
-    }
-
-    private fun legacyWarning(settings: MavenIndexerSettings) {
-        if (!settings.legacy)
+        if (!newSettings.enabled)
             return
 
-        logger.warn("!!! Warning !!!")
-        logger.warn("Using legacy .zip maven index format")
-        logger.warn("It is recommended to not use the legacy index format.")
+        val durationMillis = newSettings.mavenIndexFullScanInterval.duration.toLong(MILLISECONDS)
+        val initialDelay = if (newSettings.development) 0 else durationMillis // TODO: 2024-11-05 Remove
+        scheduledIndexingTask = scheduler.scheduleAtFixedRate(::incrementalIndex, initialDelay, durationMillis, TimeUnit.MILLISECONDS)
+    }
 
+    fun incrementalIndex(startPath: Location = Location.empty()): Result<Unit, ErrorResponse> {
+        val repositories = mavenFacade.getRepositories().filter { it.storageProvider is FileSystemStorageProvider }
+        return repositories.asSequence().map { repository ->
+            incrementalIndex(repository, startPath).onError { error ->
+                logger.error("MavenIndexerService | Error while indexing repository: {}", error.message)
+            }
+        }.firstOrNull { it.isErr } ?: ok()
+    }
+
+    fun incrementalIndex(repository: Repository, startPath: Location = Location.empty()): Result<Unit, ErrorResponse> {
+        return repository.executeWithFsStorage { storageProvider ->
+            indexRepositoryLocation(repository, storageProvider, startPath)
+        }
+    }
+
+    fun rebuildIndex(repository: Repository, startPath: Location = Location.empty()): Result<Unit, ErrorResponse> {
+        return purgeIndex(repository, startPath).flatMap {
+            repository.executeWithFsStorage { storageProvider ->
+                indexRepositoryLocation(repository, storageProvider, startPath)
+            }
+        }
+    }
+
+    fun purgeIndex(startPath: Location = Location.empty()): Result<Unit, ErrorResponse> {
+        val repositories = mavenFacade.getRepositories().filter { it.storageProvider is FileSystemStorageProvider }
+        return repositories.asSequence().map { repository ->
+            purgeIndex(repository, startPath).onError { error ->
+                logger.error("MavenIndexerService | Error while purging indexed repository: {}", error.message)
+            }
+        }.firstOrNull { it.isErr } ?: ok()
+    }
+
+    fun purgeIndex(repository: Repository, startPath: Location = Location.empty()): Result<Unit, ErrorResponse> {
+        return repository.executeWithFsStorage { storageProvider ->
+            val indexingContext = components.indexingContext(repository, indexer, storageProvider)
+            try {
+                indexingContext.purge() // TODO: 2024-11-07 Only purge contents from the startPath
+                indexingContext.commit()
+            } finally {
+                indexer.closeIndexingContext(indexingContext, true)
+            }
+        }
     }
 
     fun search(searchRequest: MavenIndexerSearchRequest): Result<MavenIndexerSearchResponse, ErrorResponse> {
@@ -83,5 +146,264 @@ internal class MavenIndexerService(
         TODO("Finish search impl")
     }
 
+    fun findDetails(lookupRequest: LookupRequest): Result<FileDetails, ErrorResponse> {
+        return mavenFacade.findDetails(lookupRequest).map { it /* typing moment */ }.flatMapErr {
+            resolve(lookupRequest) { repository, gav ->
+                findLocalDetails(repository, gav)
+            }
+        }
+    }
+
+    fun findFile(lookupRequest: LookupRequest): Result<ResolvedDocument, ErrorResponse> {
+        return mavenFacade.findFile(lookupRequest).flatMapErr {
+            resolve(lookupRequest) { repository, gav ->
+                findFile(lookupRequest.accessToken, repository, gav).map { (details, stream) ->
+                    ResolvedDocument(document = details, cachable = repository.acceptsCachingOf(gav), content = stream)
+                }
+            }
+        }
+    }
+
+    fun findInputStream(lookupRequest: LookupRequest): Result<InputStream, ErrorResponse> {
+        return mavenFacade.findData(lookupRequest).flatMapErr {
+            resolve(lookupRequest) { repository, gav ->
+                findInputStream(repository, gav)
+            }
+        }
+    }
+
+    fun shutdown() {
+        scheduledIndexingTask.cancel(false)
+        scheduler.close()
+    }
+
+    private fun Repository.executeWithFsStorage(block: (FileSystemStorageProvider) -> Unit): Result<Unit, ErrorResponse> {
+        val storageProvider = storageProvider
+
+        return if (storageProvider !is FileSystemStorageProvider)
+            badRequestError("Repository must be located on the local file system")
+        else
+            scheduler.execute {
+                try {
+                    block(storageProvider)
+                } catch (e: Exception) {
+                    failureFacade.throwException("MavenIndexerService | exception while executing scheduled task", e)
+                }
+            }.asSuccess()
+    }
+
+    private fun indexRepositoryLocation(
+        repository: Repository,
+        storageProvider: FileSystemStorageProvider,
+        startPath: Location,
+    ) {
+        logger.info("MavenIndexerService | Indexing the {} repository", repository.name)
+        val indexingContext = components.indexingContext(repository, indexer, storageProvider)
+
+        try {
+            val scanner = components.scanner()
+            val searcher = indexingContext.acquireIndexSearcher()
+
+            logger.debug("MavenIndexerService | Scanning the {} repository", repository.name)
+            scanner.scan(components.scanningRequest(indexingContext, ReindexArtifactScanningListener(indexingContext), startPath))
+
+            try {
+                logger.debug("MavenIndexerService | Packing the {} repository", repository.name)
+                val packer = components.indexPacker()
+
+                packer.packIndex(components.indexPackingRequest(indexingContext, searcher, repository))
+
+                indexingContext.commit()
+            } catch (e: Exception) {
+                failureFacade.throwException("MavenIndexerService | Could not pack index for ${repository.name}", e)
+            } finally {
+                indexingContext.releaseIndexSearcher(searcher)
+            }
+        } finally {
+            indexer.closeIndexingContext(indexingContext, false)
+        }
+    }
+
+    private fun <T> resolve(
+        lookupRequest: LookupRequest,
+        block: (Repository, Location) -> Result<T, ErrorResponse>
+    ): Result<T, ErrorResponse> {
+        val (accessToken, repositoryName, gav) = lookupRequest
+        val repository = mavenFacade.getRepository(repositoryName) ?: return notFoundError("Repository $repositoryName not found")
+
+        return mavenFacade.canAccessResource(accessToken, repository, gav)
+            .onError { logger.debug("ACCESS | Unauthorized attempt of access (token: $accessToken) to $gav from ${repository.name}") }
+            .peek { extensions.emitEvent(PreResolveEvent(accessToken, repository, gav)) }
+            .flatMap { block(repository, gav) }
+    }
+
+    private fun findFile(
+        accessToken: AccessTokenIdentifier?,
+        repository: Repository,
+        gav: Location
+    ): Result<Pair<DocumentInfo, InputStream>, ErrorResponse> {
+        return findLocalDetails(repository, gav)
+            .`is`(DocumentInfo::class.java) { notFound("Requested file is a directory") }
+            .flatMap { details -> findInputStream(repository, gav).map { details to it } }
+            .let { extensions.emitEvent(ResolvedFileEvent(accessToken, repository, gav, it)).result }
+    }
+
+    private fun findInputStream(repository: Repository, gav: Location): Result<InputStream, ErrorResponse> {
+        return repository.storageProvider.getFile(gav)
+    }
+
+    private fun findLocalDetails(
+        repository: Repository,
+        gav: Location
+    ): Result<FileDetails, ErrorResponse> {
+        return getFileDetails(repository, gav).map { it }
+    }
+
+    private fun getFileDetails(repository: Repository, location: Location) = location.resolveWithRootDirectory(repository).exists()
+        .flatMap { if (it.exists() && it.isRegularFile()) toDocumentInfo(it) else notFoundError("File not found") }
+
+    private fun Result<Path, ErrorResponse>.exists() = filter({ Files.exists(it) }) { notFound("File not found") }
+
+    private fun Location.resolveWithRootDirectory(repository: Repository): Result<Path, ErrorResponse> {
+        return toPath().map { components.indexPath(repository).resolve(it) }.mapErr { badRequest(it) }
+    }
+
+    private fun toDocumentInfo(path: Path): Result<DocumentInfo, ErrorResponse> {
+        val attributes = path.readAttributes<BasicFileAttributes>()
+        val contentType = ContentType.getContentTypeByExtension(path.extension) ?: APPLICATION_OCTET_STREAM
+        val lastModified = attributes.lastModifiedTime().toInstant()
+
+        return DocumentInfo(path.name, contentType, attributes.size(), lastModified).asSuccess()
+    }
+
     override fun getLogger(): Logger = journalist.logger
+
+    private inner class ReindexArtifactScanningListener(
+        private val context: IndexingContext,
+    ) : ArtifactScanningListener {
+        private val artifactsToProcess = mutableMapOf<String, ArtifactInfo>()
+        private val processedUinfos = mutableSetOf<String>()
+        private val groupIds = mutableSetOf<String>()
+        private val rootGroups = mutableSetOf<String>()
+        private val exceptions = mutableListOf<Exception>()
+
+        private var totalFiles: Int = 0
+        private var deletedFiles: Int = 0
+
+        override fun scanningStarted(context: IndexingContext) {
+            try {
+                initialize(context)
+            } catch (ex: IOException) {
+                exceptions += ex
+            }
+        }
+
+        private fun initialize(context: IndexingContext) {
+            val indexSearcher = context.acquireIndexSearcher()
+            try {
+                val reader = indexSearcher.indexReader
+                val liveDocs = MultiBits.getLiveDocs(reader)
+
+                for (documentId in 0 until reader.maxDoc()) {
+                    if (liveDocs == null || liveDocs[documentId]) {
+                        val document = reader.storedFields().document(documentId)
+
+                        val artifactInfo = IndexUtils.constructArtifactInfo(document, context)
+
+                        if (artifactInfo != null && !context.isReceivingUpdates)
+                            artifactsToProcess[artifactInfo.uinfo] = artifactInfo // if not receiving external updates
+                    }
+                }
+            } finally {
+                context.releaseIndexSearcher(indexSearcher)
+            }
+        }
+
+        override fun artifactError(artifactContext: ArtifactContext, exception: Exception) {
+            exceptions += exception
+        }
+
+        override fun artifactDiscovered(artifactContext: ArtifactContext) {
+            logger.debug("MavenIndexerService | discovered artifact {}", artifactContext.artifact?.path)
+            val artifactInfo = artifactContext.artifactInfo
+
+            if (VersionUtils.isSnapshot(artifactInfo.version) && artifactInfo.uinfo in processedUinfos)
+                return // skip all snapshots other than the first one
+
+            processedUinfos += artifactInfo.uinfo
+
+            if (artifactInfo.uinfo in artifactsToProcess)
+                artifactsToProcess -= artifactInfo.uinfo
+
+            try {
+                indexer.addArtifactToIndex(artifactContext, context)
+
+                exceptions += artifactContext.errors
+
+                rootGroups += artifactInfo.rootGroup
+                groupIds += artifactInfo.groupId
+
+                totalFiles += 1
+            } catch (e: Exception) {
+                exceptions += e
+            }
+        }
+
+        override fun scanningFinished(context: IndexingContext, result: ScanningResult) {
+            context.setRootGroups(rootGroups)
+            context.setAllGroups(groupIds)
+
+            try {
+                context.commit()
+            } catch (e: Exception) {
+                exceptions += e
+            }
+
+            try {
+                if (!context.isReceivingUpdates)
+                    removeDeletedArtifacts(context, result.request.startingPath)
+            } catch (e: Exception) {
+                exceptions += e
+            }
+
+            try {
+                context.commit()
+            } catch (e: Exception) {
+                exceptions += e
+            }
+
+            logger.debug("MavenIndexerService | Scanning finished, indexed {} files, removed {} stale files", totalFiles, deletedFiles)
+
+            if (exceptions.isNotEmpty()) {
+                logger.error("MavenIndexerService | Scanning produced {} exceptions", exceptions.size)
+
+                for (exception in exceptions)
+                    failureFacade.throwException("MavenIndexerService | Exception while indexing:", exception)
+            }
+        }
+
+        private fun removeDeletedArtifacts(context: IndexingContext, contextPath: String) {
+            // remove all artifacts that could not be located
+            // this *might* gobble up a bunch of memory? unsure.
+            val artifactsToRemove = artifactsToProcess.asSequence().flatMap { (_, artifactInfo) ->
+                val query = indexer.constructQuery(NEXUS.UINFO, artifactInfo.uinfo, SearchType.EXACT)
+                indexer.searchIterator(IteratorSearchRequest(query, listOf(context)) { _, other ->
+                    other.uinfo == artifactInfo.uinfo
+                }).asSequence() + artifactInfo
+            }.filter { artifactInfo ->
+                context.gavCalculator.gavToPath(artifactInfo.calculateGav()).startsWith(contextPath)
+            }.distinctBy { artifactInfo ->
+                artifactInfo.uinfo
+            }.map { artifactInfo ->
+                ArtifactContext(null, null, null, artifactInfo, artifactInfo.calculateGav())
+            }.toList()
+
+            indexer.deleteArtifactsFromIndex(artifactsToRemove, context)
+            deletedFiles = artifactsToRemove.size
+
+            if (deletedFiles > 0) {
+                context.commit()
+            }
+        }
+    }
 }

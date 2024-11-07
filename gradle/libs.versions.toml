@@ -1,50 +1,44 @@
 [versions]
-kotlin = "1.7.20"
-lucene = "9.4.2"
+kotlin = "2.0.20"
+ksp = "2.0.20-1.0.25"
+dokka = "1.9.20"
+shadow = "8.3.5"
+nyx = "0.2.3"
+kotlinx-datetime = "0.6.1"
+slf4j = "2.0.16"
+reposilite = "3.5.18"
+maven-indexer = "7.1.5"
+lucene = "9.11.1"
 dsiutils = "2.7.2"
 junit-jupiter = "5.9.1"
-shadow = "7.1.2"
-reposilite = "3.2.6"
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "kotlin" }
 
-grgit = { id = "org.ajoberstar.grgit.service", version = "5.0.0" }
+dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 
-shadow = { id = "com.github.johnrengelman.shadow", version.ref = "shadow" }
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
 
-idea-ext = { id = "org.jetbrains.gradle.plugin.idea-ext", version = "1.1.6" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 
-ksp = { id = "com.google.devtools.ksp", version = "1.7.20-1.0.8" }
-
-dokka = { id = "org.jetbrains.dokka", version.ref = "kotlin" }
-
+nyx = { id = "ca.solo-studios.nyx", version.ref = "nyx" }
 
 [libraries]
 
 # Kotlin stdlib
 kotlin-stdlib = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version.ref = "kotlin" }
-kotlin-stdlib-jdk7 = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib-jdk7", version.ref = "kotlin" }
-kotlin-stdlib-jdk8 = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib-jdk8", version.ref = "kotlin" }
 
 kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
 
-# Jetbrains Annotations
-## Annotations for documentation and static code analysis
-jetbrains-annotations = { group = "org.jetbrains", name = "annotations", version = "23.0.0" }
+kotlinx-datetime = { group = "org.jetbrains.kotlinx", name = "kotlinx-datetime", version.ref = "kotlinx-datetime" }
 
 # Reposilite
 ##
 reposilite = { group = "com.reposilite", name = "reposilite", version.ref = "reposilite" }
-reposilite-backend = { group = "com.reposilite", name = "reposilite", version.ref = "reposilite" }
-reposilite-frontend = { group = "com.reposilite", name = "reposilite", version.ref = "reposilite" }
-reposilite-plugin-checksum = { group = "com.reposilite", name = "reposilite", version.ref = "reposilite" }
-reposilite-plugin-groovy = { group = "com.reposilite", name = "reposilite", version.ref = "reposilite" }
-reposilite-plugin-javadoc = { group = "com.reposilite", name = "reposilite", version.ref = "reposilite" }
-reposilite-plugin-swagger = { group = "com.reposilite", name = "reposilite", version.ref = "reposilite" }
 
-javalin-openapi-plugin = { group = "io.javalin.community.openapi", name = "javalin-openapi-plugin", version = "5.3.2-SNAPSHOT" }
+javalin-openapi-plugin = { group = "io.javalin.community.openapi", name = "javalin-openapi-plugin", version = "6.3.0" }
+javalin-openapi-processor = { group = "io.javalin.community.openapi", name = "openapi-annotation-processor", version = "6.3.0" }
 
 # Guava
 ## A set of core Java libraries from Google that includes new collection types, immutable collections, a graph library,
@@ -56,7 +50,7 @@ guava-kotlin = { group = "ca.solo-studios", name = "guava-kotlin", version = "0.
 
 # Maven Indexer
 ##
-maven-indexer = { group = "org.apache.maven.indexer", name = "indexer-core", version = "7.0.0" }
+maven-indexer = { group = "org.apache.maven.indexer", name = "indexer-core", version.ref = "maven-indexer" }
 
 # Apache Lucene
 ## A Java library providing powerful indexing and search features, as well as spellchecking,
@@ -94,7 +88,9 @@ lucene-backward-codecs = { group = "org.apache.lucene", name = "lucene-backward-
 
 # KSP Service Annotation
 ## An annotation based generator for java the ServiceProvider META-INF configuration
-ksp-service = { group = "ca.solo-studios", name = "ksp-service-annotation", version = "1.0.3" }
+ksp-service = { group = "ca.solo-studios", name = "ksp-service-annotation", version = "1.0.8" }
+
+cron-utils = { group = "com.cronutils", name = "cron-utils", version = "9.2.0" }
 
 # JUnit
 ## Unit testing framework for Java
@@ -103,21 +99,9 @@ junit-jupiter-engine = { group = "org.junit.jupiter", name = "junit-jupiter-engi
 junit-jupiter-params = { group = "org.junit.jupiter", name = "junit-jupiter-params", version.ref = "junit-jupiter" }
 
 [bundles]
-kotlin-base = [
-    "kotlin-stdlib",
-    "kotlin-stdlib-jdk7",
-    "kotlin-stdlib-jdk8",
-]
 
 kotlin-test = [
     "kotlin-test",
-]
-
-reposilite-plugins = [
-    "reposilite-plugin-checksum",
-    "reposilite-plugin-groovy",
-    "reposilite-plugin-javadoc",
-    "reposilite-plugin-swagger",
 ]
 
 lucene = [

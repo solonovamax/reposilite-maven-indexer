@@ -3,7 +3,7 @@ package ca.solostudios.reposilite.mvnindexer.infrastructure
 import ca.solostudios.reposilite.mvnindexer.MavenIndexerFacade
 import com.reposilite.maven.infrastructure.MavenRoutes
 import com.reposilite.web.api.ReposiliteRoute
-import com.reposilite.web.routing.RouteMethod.GET
+import io.javalin.community.routing.Route
 import io.javalin.http.ContentType
 import io.javalin.openapi.HttpMethod
 import io.javalin.openapi.OpenApi
@@ -15,7 +15,6 @@ import panda.std.Result
 internal class MavenIndexerSearchEndpoints(
     private val mavenIndexerFacade: MavenIndexerFacade,
 ) : MavenRoutes(mavenIndexerFacade.mavenFacade) {
-
     @OpenApi(
         tags = ["MavenIndexer"],
         path = "/api/maven-indexer/{repository}/index",
@@ -34,13 +33,13 @@ internal class MavenIndexerSearchEndpoints(
             ),
         ]
     )
-    private val index = ReposiliteRoute<Any>("/api/maven-indexer/{repository}/index", GET) {
-//        authorized { // TODO
-        requireRepository { repository ->
-            mavenIndexerFacade.indexRepository(repository)
-            response = Result.ok("ok")
+    private val index = ReposiliteRoute<Any>("/api/maven-indexer/{repository}/index", Route.GET) {
+        managerOnly {
+            requireRepository { repository ->
+                mavenIndexerFacade.indexRepository(repository)
+                response = Result.ok("ok")
+            }
         }
-//        }
     }
 
     override val routes = routes(index)

@@ -1,5 +1,6 @@
 package ca.solostudios.reposilite.mvnindexer
 
+import ca.solostudios.reposilite.mvnindexer.MavenIndexerSettings.MavenIndexer
 import ca.solostudios.reposilite.mvnindexer.infrastructure.MavenIndexerService
 import com.reposilite.Reposilite
 import com.reposilite.ReposiliteParameters
@@ -10,25 +11,35 @@ import com.reposilite.plugin.api.PluginComponents
 import com.reposilite.shared.extensions.NamedThreadFactory
 import com.reposilite.status.FailureFacade
 import com.reposilite.storage.StorageFacade
+import com.reposilite.storage.api.Location
 import com.reposilite.storage.filesystem.FileSystemStorageProvider
+import org.apache.lucene.search.IndexSearcher
+import org.apache.maven.index.ArtifactScanningListener
+import org.apache.maven.index.DefaultArtifactContextProducer
 import org.apache.maven.index.DefaultIndexer
 import org.apache.maven.index.DefaultIndexerEngine
 import org.apache.maven.index.DefaultQueryCreator
+import org.apache.maven.index.DefaultScanner
 import org.apache.maven.index.DefaultSearchEngine
 import org.apache.maven.index.Indexer
-import org.apache.maven.index.IndexerEngine
-import org.apache.maven.index.QueryCreator
-import org.apache.maven.index.SearchEngine
-import org.apache.maven.index.context.IndexCreator
+import org.apache.maven.index.ScanningRequest
+import org.apache.maven.index.artifact.DefaultArtifactPackagingMapper
 import org.apache.maven.index.context.IndexingContext
 import org.apache.maven.index.creator.JarFileContentsIndexCreator
 import org.apache.maven.index.creator.MavenArchetypeArtifactInfoIndexCreator
 import org.apache.maven.index.creator.MavenPluginArtifactInfoIndexCreator
 import org.apache.maven.index.creator.MinimalArtifactInfoIndexCreator
 import org.apache.maven.index.creator.OsgiArtifactIndexCreator
+import org.apache.maven.index.incremental.DefaultIncrementalHandler
+import org.apache.maven.index.packer.DefaultIndexPacker
+import org.apache.maven.index.packer.IndexPackingRequest
+import org.apache.maven.index.packer.IndexPackingRequest.IndexFormat
 import panda.std.reactive.Reference
-import java.util.concurrent.ScheduledThreadPoolExecutor
+import java.nio.file.Path
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
 import kotlin.io.path.Path
+import kotlin.io.path.createDirectories
 
 internal class MavenIndexerComponents(
     private val reposilite: Reposilite,
@@ -40,8 +51,8 @@ internal class MavenIndexerComponents(
     private val mavenIndexerSettings: Reference<MavenIndexerSettings>
 ) : PluginComponents {
     private val indexPath = mavenIndexerSettings
-        .computed { it.indexPath ?: ".maven-index/" }
-        .computed { Path(it) }
+        .computed { it.indexPath }
+        .computed { Path(".", it) }
 
     private val indexCreators = listOf(
         MinimalArtifactInfoIndexCreator(),
@@ -51,80 +62,99 @@ internal class MavenIndexerComponents(
         OsgiArtifactIndexCreator(),
     ).associateBy { it.id }
 
-    private fun searchEngine(): SearchEngine {
-        return DefaultSearchEngine()
+    fun indexPath(repository: Repository, name: String? = null): Path {
+        val path = indexPath.get().resolve(repository.name)
+        return if (name == null) path else path.resolve(name)
     }
 
-    private fun indexerEngine(): IndexerEngine {
-        return DefaultIndexerEngine()
-    }
-
-    private fun queryCreator(): QueryCreator {
-        return DefaultQueryCreator()
-    }
-
-    private fun mavenIndexer(): Indexer {
-        return DefaultIndexer(
-            searchEngine(),
-            indexerEngine(),
-            queryCreator(),
-        )
-    }
-
-    private fun Repository.indexPath() = indexPath.get().resolve(this.name)
-
-    private fun indexCreators(indexersString: String): List<IndexCreator> {
-        return when (indexersString) {
-            // full includes all index creators
-            "full"    -> return indexCreators.values.toList()
-            // default includes 'min' and 'jarContent' creators
-            "default" -> return listOf(MinimalArtifactInfoIndexCreator(), JarFileContentsIndexCreator())
-
-            else      -> {
-                indexersString.split(',').mapNotNull { indexCreators[it] }
-            }
-        }
-    }
-
-    internal fun indexingContext(
+    fun indexingContext(
         repository: Repository,
-        fsProvider: FileSystemStorageProvider,
         indexer: Indexer,
-        settings: MavenIndexerSettings,
-    ): IndexingContext {
-        return indexer.createIndexingContext(
-            "${repository.name}-ctx",
-            repository.name,
-            fsProvider.rootDirectory.toFile(),
-            repository.indexPath().toFile(),
-            null,
-            null,
-            settings.searchable,
-            false,
-            indexCreators(settings.indexers),
-        )
+        fsProvider: FileSystemStorageProvider,
+    ) = indexer.createIndexingContext(
+        repository.name,
+        repository.name,
+        fsProvider.rootDirectory.toFile(),
+        indexPath(repository, "search-index").createDirectories().toFile(),
+        null,
+        null,
+        settings().searchable,
+        false,
+        indexCreators(settings().indexers),
+    )
+
+    fun scanner() = DefaultScanner(artifactContextProducer())
+
+    fun scanningRequest(
+        indexingContext: IndexingContext,
+        listener: ArtifactScanningListener,
+        startingPath: Location,
+    ) = ScanningRequest(indexingContext, listener, startingPath.toString())
+
+    fun indexPackingRequest(
+        indexingContext: IndexingContext,
+        searcher: IndexSearcher,
+        repository: Repository,
+    ) = IndexPackingRequest(
+        indexingContext,
+        searcher.indexReader,
+        indexPath(repository, "maven-index").createDirectories().toFile(),
+    ).also { request ->
+        request.isCreateChecksumFiles = settings().createChecksumFiles
+        request.isCreateIncrementalChunks = settings().incrementalChunks
+        request.maxIndexChunks = settings().incrementalChunksCount
+        request.formats = listOf(IndexFormat.FORMAT_V1)
     }
 
-    private fun scheduler(): ScheduledThreadPoolExecutor = ScheduledThreadPoolExecutor(1, NamedThreadFactory("Maven Indexer (1) - "))
+    fun indexPacker() = DefaultIndexPacker(incrementalHandler())
 
-    private fun mavenIndexerService(): MavenIndexerService =
-        MavenIndexerService(
-            indexer = mavenIndexer(),
-            journalist = journalist,
-            mavenFacade = mavenFacade,
-            failureFacade = failureFacade,
-            storageFacade = storageFacade,
-            mavenIndexerSettings = mavenIndexerSettings,
-            components = this,
-            scheduler = scheduler(),
-        )
+    fun mavenIndexerFacade() = MavenIndexerFacade(
+        journalist = journalist,
+        mavenFacade = mavenFacade,
+        mavenIndexerService = mavenIndexerService(),
+        settings = mavenIndexerSettings,
+    )
 
-    fun mavenIndexerFacade(
-        mavenIndexerService: MavenIndexerService = mavenIndexerService(),
-    ): MavenIndexerFacade =
-        MavenIndexerFacade(
-            journalist = journalist,
-            mavenFacade = mavenFacade,
-            mavenIndexerService = mavenIndexerService,
-        )
+    fun scheduler(): ScheduledExecutorService {
+        val maxThreads = settings().maxParallelIndexRepositories
+        return Executors.newScheduledThreadPool(maxThreads, NamedThreadFactory("Maven Indexer ($maxThreads) - "))
+    }
+
+    private fun indexCreators(indexers: List<MavenIndexer>) = indexers.asSequence().flatMap {
+        when (it) {
+            MavenIndexer.FULL            -> indexCreators.values.toList()
+            MavenIndexer.MINIMAL         -> listOf(MinimalArtifactInfoIndexCreator())
+            MavenIndexer.JAR_CONTENT     -> listOf(JarFileContentsIndexCreator())
+            MavenIndexer.MAVEN_ARCHETYPE -> listOf(MavenArchetypeArtifactInfoIndexCreator())
+            MavenIndexer.MAVEN_PLUGIN    -> listOf(MavenPluginArtifactInfoIndexCreator())
+            MavenIndexer.OSGI_METADATA   -> listOf(OsgiArtifactIndexCreator())
+        }
+    }.distinctBy { it.id }.toList()
+
+    private fun artifactContextProducer() = DefaultArtifactContextProducer(artifactPackagingMapper())
+
+    private fun artifactPackagingMapper() = DefaultArtifactPackagingMapper()
+
+    private fun incrementalHandler() = DefaultIncrementalHandler()
+
+    private fun mavenIndexer() = DefaultIndexer(searchEngine(), indexerEngine(), queryCreator())
+
+    private fun searchEngine() = DefaultSearchEngine()
+
+    private fun indexerEngine() = DefaultIndexerEngine()
+
+    private fun queryCreator() = DefaultQueryCreator()
+
+    private fun mavenIndexerService() = MavenIndexerService(
+        indexer = mavenIndexer(),
+        journalist = journalist,
+        mavenFacade = mavenFacade,
+        failureFacade = failureFacade,
+        storageFacade = storageFacade,
+        mavenIndexerSettings = mavenIndexerSettings,
+        components = this,
+        extensions = reposilite.extensions
+    )
+
+    private fun settings(): MavenIndexerSettings = mavenIndexerSettings.get()
 }
