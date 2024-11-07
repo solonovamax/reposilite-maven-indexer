@@ -80,10 +80,7 @@ internal class MavenIndexerService(
         if (::scheduledIndexingTask.isInitialized)
             scheduledIndexingTask.cancel(false)
 
-        scheduler.apply {
-            shutdownNow()
-            close()
-        }
+        scheduler.close()
         scheduler = components.scheduler()
 
         if (!newSettings.enabled)
