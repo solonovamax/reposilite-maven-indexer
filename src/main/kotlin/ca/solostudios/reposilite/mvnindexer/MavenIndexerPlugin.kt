@@ -3,7 +3,6 @@ package ca.solostudios.reposilite.mvnindexer
 import ca.solostudios.kspservice.annotation.Service
 import ca.solostudios.reposilite.mvnindexer.infrastructure.MavenIndexerApiEndpoints
 import ca.solostudios.reposilite.mvnindexer.infrastructure.MavenIndexerEndpoints
-import ca.solostudios.reposilite.mvnindexer.infrastructure.MavenIndexerSearchEndpoints
 import com.reposilite.configuration.shared.SharedConfigurationFacade
 import com.reposilite.plugin.api.Facade
 import com.reposilite.plugin.api.Plugin
@@ -47,7 +46,7 @@ public class MavenIndexerPlugin : ReposilitePlugin() {
         event { event: RoutingSetupEvent ->
             event.registerRoutes(MavenIndexerEndpoints(mavenIndexerFacade))
             event.registerRoutes(MavenIndexerApiEndpoints(mavenIndexerFacade))
-            event.registerRoutes(MavenIndexerSearchEndpoints(mavenIndexerFacade))
+            // event.registerRoutes(MavenIndexerSearchEndpoints(mavenIndexerFacade))
         }
 
         event<ReposiliteDisposeEvent> {
