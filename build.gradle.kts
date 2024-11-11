@@ -47,7 +47,7 @@ nyx {
         allWarnings = true
         distributeLicense = true
         reproducibleBuilds = true
-        jvmTarget = 17
+        jvmTarget = 11
 
         kotlin {
             apiVersion = "2.0"
