@@ -22,7 +22,21 @@ nyx {
         group = "ca.solo-studios"
         module = "reposilite-maven-indexer"
         version = "0.1.0"
+        description = """
+            A plugin for reposilite, which runs Maven Indexer
+        """.trimIndent()
 
+        organizationUrl = "https://solo-studios.ca/"
+        organizationName = "Solo Studios"
+
+        developer {
+            id = "solonovamax"
+            name = "solonovamax"
+            email = "solonovamax@12oclockpoint.com"
+            url = "https://solonovamax.gay"
+        }
+
+        repository.fromGithub("solo-studios", "reposilite-maven-indexer")
         license.useMIT()
     }
 
@@ -40,6 +54,44 @@ nyx {
             languageVersion = "2.0"
 
             withExplicitApi()
+        }
+    }
+
+    publishing {
+        withSignedPublishing()
+
+        repositories {
+            maven {
+                name = "Sonatype"
+
+                val repositoryId: String? by project
+                url = when {
+                    repositoryId != null -> uri("https://s01.oss.sonatype.org/service/local/staging/deployByRepositoryId/$repositoryId/")
+                    else                 -> uri("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/")
+                }
+
+                credentials(PasswordCredentials::class)
+            }
+            maven {
+                name = "SoloStudiosReleases"
+
+                url = uri("https://maven.solo-studios.ca/releases/")
+
+                credentials(PasswordCredentials::class)
+                authentication { // publishing doesn't work without this for some reason
+                    create<BasicAuthentication>("basic")
+                }
+            }
+            maven {
+                name = "SoloStudiosSnapshots"
+
+                url = uri("https://maven.solo-studios.ca/snapshots/")
+
+                credentials(PasswordCredentials::class)
+                authentication { // publishing doesn't work without this for some reason
+                    create<BasicAuthentication>("basic")
+                }
+            }
         }
     }
 }
@@ -132,13 +184,4 @@ tasks {
         workingDir(runDir)
         standardInput = System.`in`
     }
-
-    // named<JavaExec>("run") {
-    //     dependsOn(prepRun)
-    //
-    //     classpath(configurations.shadow, configurations.runtimeClasspath)
-    //
-    //     workingDir(runDir)
-    //     standardInput = System.`in`
-    // }
 }
