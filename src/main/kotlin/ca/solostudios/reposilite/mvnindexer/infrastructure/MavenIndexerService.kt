@@ -66,14 +66,14 @@ internal class MavenIndexerService(
     private val failureFacade: FailureFacade,
     private val storageFacade: StorageFacade,
     private val extensions: Extensions,
-    private val mavenIndexerSettings: Reference<MavenIndexerSettings>,
+    settings: Reference<MavenIndexerSettings>,
     private val components: MavenIndexerComponents,
 ) : Journalist {
     private var scheduler: ScheduledExecutorService = components.scheduler()
     private lateinit var scheduledIndexingTask: ScheduledFuture<*>
 
     init {
-        mavenIndexerSettings.subscribeDetailed(::settingsUpdate, true)
+        settings.subscribeDetailed(::settingsUpdate, true)
     }
 
     private fun settingsUpdate(oldSettings: MavenIndexerSettings, newSettings: MavenIndexerSettings) {

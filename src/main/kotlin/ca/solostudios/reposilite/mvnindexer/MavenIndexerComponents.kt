@@ -3,7 +3,6 @@ package ca.solostudios.reposilite.mvnindexer
 import ca.solostudios.reposilite.mvnindexer.MavenIndexerSettings.MavenIndexer
 import ca.solostudios.reposilite.mvnindexer.infrastructure.MavenIndexerService
 import com.reposilite.Reposilite
-import com.reposilite.ReposiliteParameters
 import com.reposilite.journalist.Journalist
 import com.reposilite.maven.MavenFacade
 import com.reposilite.maven.Repository
@@ -43,7 +42,6 @@ import kotlin.io.path.createDirectories
 
 internal class MavenIndexerComponents(
     private val reposilite: Reposilite,
-    private val parameters: ReposiliteParameters,
     private val journalist: Journalist,
     private val failureFacade: FailureFacade,
     private val storageFacade: StorageFacade,
@@ -53,14 +51,6 @@ internal class MavenIndexerComponents(
     private val indexPath = mavenIndexerSettings
         .computed { it.indexPath }
         .computed { Path(".", it) }
-
-    private val indexCreators = listOf(
-        MinimalArtifactInfoIndexCreator(),
-        JarFileContentsIndexCreator(),
-        MavenArchetypeArtifactInfoIndexCreator(),
-        MavenPluginArtifactInfoIndexCreator(),
-        OsgiArtifactIndexCreator(),
-    ).associateBy { it.id }
 
     fun indexPath(repository: Repository, name: String? = null): Path {
         val path = indexPath.get().resolve(repository.name)
@@ -112,7 +102,6 @@ internal class MavenIndexerComponents(
         journalist = journalist,
         mavenFacade = mavenFacade,
         mavenIndexerService = mavenIndexerService(),
-        settings = mavenIndexerSettings,
     )
 
     fun scheduler(): ScheduledExecutorService {
@@ -122,7 +111,13 @@ internal class MavenIndexerComponents(
 
     private fun indexCreators(indexers: List<MavenIndexer>) = indexers.asSequence().flatMap {
         when (it) {
-            MavenIndexer.FULL            -> indexCreators.values.toList()
+            MavenIndexer.FULL -> listOf(
+                MinimalArtifactInfoIndexCreator(),
+                JarFileContentsIndexCreator(),
+                MavenArchetypeArtifactInfoIndexCreator(),
+                MavenPluginArtifactInfoIndexCreator(),
+                OsgiArtifactIndexCreator(),
+            )
             MavenIndexer.MINIMAL         -> listOf(MinimalArtifactInfoIndexCreator())
             MavenIndexer.JAR_CONTENT     -> listOf(JarFileContentsIndexCreator())
             MavenIndexer.MAVEN_ARCHETYPE -> listOf(MavenArchetypeArtifactInfoIndexCreator())
@@ -151,7 +146,7 @@ internal class MavenIndexerComponents(
         mavenFacade = mavenFacade,
         failureFacade = failureFacade,
         storageFacade = storageFacade,
-        mavenIndexerSettings = mavenIndexerSettings,
+        settings = mavenIndexerSettings,
         components = this,
         extensions = reposilite.extensions
     )

@@ -12,7 +12,6 @@ import io.javalin.openapi.OpenApiResponse
 internal class MavenIndexerEndpoints(
     private val mavenIndexerFacade: MavenIndexerFacade,
 ) : MavenRoutes(mavenIndexerFacade.mavenFacade) {
-
     @OpenApi(
         tags = ["MavenIndexer"],
         path = "/{repository}/.index/<gav>",
@@ -32,8 +31,8 @@ internal class MavenIndexerEndpoints(
             )
         ]
     )
-    private val index = ReposiliteRoute<Unit>("/{repository}/.index/<gav>", Route.POST) {
-        managerOnly {
+    private val findFile = ReposiliteRoute<Unit>("/{repository}/.index/<gav>", Route.POST) {
+        accessed {
             requireRepository { repository ->
                 requireGav { gav ->
                     response = mavenIndexerFacade.indexRepository(repository, gav)
@@ -42,6 +41,6 @@ internal class MavenIndexerEndpoints(
         }
     }
 
-    override val routes = routes(index)
+    override val routes = routes(findFile)
 }
 

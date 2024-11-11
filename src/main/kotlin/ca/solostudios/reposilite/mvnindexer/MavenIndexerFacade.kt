@@ -12,14 +12,12 @@ import com.reposilite.shared.ErrorResponse
 import com.reposilite.storage.api.FileDetails
 import com.reposilite.storage.api.Location
 import panda.std.Result
-import panda.std.reactive.Reference
 import java.io.InputStream
 
 public class MavenIndexerFacade internal constructor(
     public val journalist: Journalist,
     public val mavenFacade: MavenFacade,
     private val mavenIndexerService: MavenIndexerService,
-    private val settings: Reference<MavenIndexerSettings>,
 ) : Journalist, Facade {
     public fun indexRepository(
         repository: Repository,
