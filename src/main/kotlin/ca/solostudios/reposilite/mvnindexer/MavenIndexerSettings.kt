@@ -11,42 +11,79 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 
 @JsonSchema(requireNonNulls = false)
-@Doc(title = "Maven Indexer", description = "Maven Indexer module configuration.")
+@Doc(
+    title = "Maven Indexer",
+    description = """
+        Maven Indexer module configuration.
+    """
+)
 public data class MavenIndexerSettings(
-    @get:Doc(title = "Enabled", description = "If building the maven indexes is enabled. Defaults to false.")
+    @get:Doc(
+        title = "Enabled",
+        description = """
+            If building the maven indexes is enabled. Defaults to false.
+        """
+    )
     val enabled: Boolean = false,
-    @get:Doc(title = "Searchable", description = "Enable searching via Maven Indexer. Defaults to false.")
+    @get:Doc(
+        title = "Searchable",
+        description = """
+            Enable searching via Maven Indexer. Defaults to false.
+        """
+    )
     val searchable: Boolean = false,
-    @get:Doc(title = "Index Path", description = "The path for the maven index. Defaults to './.maven-index/'.")
+    @get:Doc(
+        title = "Index Path",
+        description = """
+            The path for the maven index. Defaults to './.maven-index/'.
+        """
+    )
     val indexPath: String = ".maven-index/",
-    @get:Doc(title = "Incremental Chunks", description = "Create incremental index chunks. Defaults to true.")
+    @get:Doc(
+        title = "Incremental Chunks",
+        description = """
+            Create incremental index chunks. Defaults to true.
+        """
+    )
     val incrementalChunks: Boolean = true,
     @Min(min = 1)
-    @get:Doc(title = "Incremental Chunks Count", description = "The number of incremental chunks to keep. Defaults to 32.")
+    @get:Doc(
+        title = "Incremental Chunks Count",
+        description = """
+            The number of incremental chunks to keep. Defaults to 32.
+        """
+    )
     val incrementalChunksCount: Int = 32,
-    @get:Doc(title = "Create Checksum Files", description = "Create checksums for all files (sha1, md5, etc.). Defaults to true.")
+    @get:Doc(
+        title = "Create Checksum Files",
+        description = """
+            Create checksums for all files (sha1, md5, etc.). Defaults to true.
+        """
+    )
     val createChecksumFiles: Boolean = false,
     @get:Doc(
         title = "Indexers",
         description = """
-            A list of indexers used to index the maven repository. Defaults to the minimal and jar indexers.
+            A list of indexers used to index the maven repository. Defaults to the minimal and jar indexers.<br><br>
 
             The available indexers are:
-            JAR_CONTENT (Indexes class names),
-            MAVEN_ARCHETYPE  (Indexes maven archetypes),
-            MAVEN_PLUGIN (Indexes maven plugins),
-            MINIMAL (Indexes group id, artifact id, version, packaging type, classifier, name, description, last modified, sha1 hash),
-            OSGI_METADATAS (Indexes OSGi metadata),
-            FULL (All indexers)
+            <ul>
+                <li>JAR_CONTENT (Indexes class names)</li>
+                <li>MAVEN_ARCHETYPE (Indexes maven archetypes)</li>
+                <li>MAVEN_PLUGIN (Indexes maven plugins)</li>
+                <li>MINIMAL (Indexes group id, artifact id, version, packaging type, classifier, name, description, last modified, sha1 hash)</li>
+                <li>OSGI_METADATAS (Indexes OSGi metadata)</li>
+                <li>FULL (All indexers)</li>
+            </ul>
         """,
     )
     val indexers: List<MavenIndexer> = listOf(MavenIndexer.MINIMAL, MavenIndexer.JAR_CONTENT),
     @get:Doc(
         title = "Full Indexing Scan Interval",
         description = """
-            How often Reposilite should attempt a full scan to re-index the maven repository.
-            With smaller durations the index is updated sooner, but it can significantly increase server load.
-            For smaller instances, this should ideally be kept low, but on more powerful servers it can be increased appropriately.
+            How often Reposilite should attempt a full scan to re-index the maven repository.<br>
+            With smaller durations the index is updated sooner, but it can significantly increase server load.<br>
+            For smaller instances, this should ideally be kept low, but on more powerful servers it can be increased appropriately.<br>
             Defaults to daily.
         """
     )
@@ -54,9 +91,9 @@ public data class MavenIndexerSettings(
     @get:Doc(
         title = "Continuous Index Updates",
         description = """
-            Continuously updates the index, as new artifacts are uploaded.
-            The full scan will still run in the background.
-            However, the artifacts indexed by this will not need to be re-indexed.
+            Continuously updates the index, as new artifacts are uploaded.<br>
+            The full scan will still run in the background.<br>
+            However, the artifacts indexed by this will not need to be re-indexed.<br>
             Defaults to false.
         """
     )
@@ -64,9 +101,10 @@ public data class MavenIndexerSettings(
     @Min(min = 1)
     @get:Doc(
         title = "Max Parallel Indexing Repositories",
+        // language=HTML
         description = """
-            Maximum number of repositories that can be indexed in parallel.
-            This setting only takes effect after a restart.
+            Maximum number of repositories that can be indexed in parallel.<br>
+            This setting only takes effect after a restart.<br>
             Defaults to 1.
         """
     )
@@ -74,7 +112,8 @@ public data class MavenIndexerSettings(
     @get:Doc(
         title = "Development",
         description = """
-            Enables development.
+            Enables development.<br>
+            This setting is purely for testing and will be removed in the future.
         """
     )
     val development: Boolean = false, // TODO: 2024-11-05 Remove
