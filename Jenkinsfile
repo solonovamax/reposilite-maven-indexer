@@ -33,7 +33,7 @@ pipeline {
                 success {
                     archiveArtifacts artifacts: '**/build/libs/*.jar', fingerprint: true, onlyIfSuccessful: true
 
-                    javadoc javadocDir: 'build/docs/javadoc/', keepAll: true
+                    javadoc javadocDir: 'build/dokka/html/', keepAll: true
                 }
             }
         }
@@ -106,7 +106,7 @@ pipeline {
                     sourceCodeEncoding: 'UTF-8',
                     checksAnnotationScope: 'ALL',
                     sourceCodeRetention: 'LAST_BUILD',
-                    tools: [java(), javaDoc()]
+                    tools: [kotlin()]
             )
 
             cleanWs()
