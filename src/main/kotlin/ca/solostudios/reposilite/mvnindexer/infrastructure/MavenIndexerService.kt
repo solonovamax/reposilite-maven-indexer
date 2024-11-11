@@ -80,7 +80,7 @@ internal class MavenIndexerService(
         if (::scheduledIndexingTask.isInitialized)
             scheduledIndexingTask.cancel(false)
 
-        scheduler.close()
+        scheduler.shutdown()
         scheduler = components.scheduler()
 
         if (!newSettings.enabled)
@@ -171,7 +171,7 @@ internal class MavenIndexerService(
 
     fun shutdown() {
         scheduledIndexingTask.cancel(false)
-        scheduler.close()
+        scheduler.shutdown()
     }
 
     private fun Repository.executeWithFsStorage(block: (FileSystemStorageProvider) -> Unit): Result<Unit, ErrorResponse> {
