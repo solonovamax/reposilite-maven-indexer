@@ -21,7 +21,7 @@ nyx {
         name = "Reposilite Maven Indexer"
         group = "ca.solo-studios"
         module = "reposilite-maven-indexer"
-        version = "0.1.0"
+        version = "0.1.0-SNAPSHOT"
         description = """
             A plugin for reposilite, which runs Maven Indexer
         """.trimIndent()
