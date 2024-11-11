@@ -57,6 +57,9 @@ internal class MavenIndexerComponents(
         return if (name == null) path else path.resolve(name)
     }
 
+    fun mavenIndexPath(repository: Repository): Path = indexPath(repository, "maven-index")
+    fun searchIndexPath(repository: Repository): Path = indexPath(repository, "search-index")
+
     fun indexingContext(
         repository: Repository,
         indexer: Indexer,
@@ -65,7 +68,7 @@ internal class MavenIndexerComponents(
         repository.name,
         repository.name,
         fsProvider.rootDirectory.toFile(),
-        indexPath(repository, "search-index").createDirectories().toFile(),
+        searchIndexPath(repository).createDirectories().toFile(),
         null,
         null,
         settings().searchable,
@@ -88,7 +91,7 @@ internal class MavenIndexerComponents(
     ) = IndexPackingRequest(
         indexingContext,
         searcher.indexReader,
-        indexPath(repository, "maven-index").createDirectories().toFile(),
+        mavenIndexPath(repository).createDirectories().toFile(),
     ).also { request ->
         request.isCreateChecksumFiles = settings().createChecksumFiles
         request.isCreateIncrementalChunks = settings().incrementalChunks

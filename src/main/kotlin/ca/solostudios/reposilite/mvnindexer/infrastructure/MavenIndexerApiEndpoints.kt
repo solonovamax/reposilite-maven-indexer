@@ -17,7 +17,7 @@ internal class MavenIndexerApiEndpoints(
         path = "/api/maven-indexer/{repository}/index",
         methods = [HttpMethod.POST],
         pathParams = [
-            OpenApiParam(name = "repository", description = "Destination repository", required = false, allowEmptyValue = true),
+            OpenApiParam(name = "repository", description = "Destination repository", required = true, allowEmptyValue = true),
         ],
         responses = [
             OpenApiResponse(status = "200", description = "Returns 200 if the request was successful"),
@@ -37,8 +37,8 @@ internal class MavenIndexerApiEndpoints(
         path = "/api/maven-indexer/{repository}/index/<gav>",
         methods = [HttpMethod.POST],
         pathParams = [
-            OpenApiParam(name = "repository", description = "Destination repository", required = false, allowEmptyValue = true),
-            OpenApiParam(name = "gav", description = "Artifact path qualifier", required = false, allowEmptyValue = true)
+            OpenApiParam(name = "repository", description = "Destination repository", required = true, allowEmptyValue = true),
+            OpenApiParam(name = "gav", description = "Artifact path qualifier", required = true, allowEmptyValue = true)
         ],
         responses = [
             OpenApiResponse(status = "200", description = "Returns 200 if the request was successful"),
@@ -90,8 +90,89 @@ internal class MavenIndexerApiEndpoints(
         }
     }
 
+    @OpenApi(
+        tags = ["MavenIndexer"],
+        path = "/api/maven-indexer/{repository}/index",
+        methods = [HttpMethod.DELETE],
+        pathParams = [
+            OpenApiParam(name = "repository", description = "Destination repository", required = true, allowEmptyValue = true),
+        ],
+        responses = [
+            OpenApiResponse(status = "200", description = "Returns 200 if the request was successful"),
+            OpenApiResponse(status = "403", description = "Returns 403 for invalid credentials"),
+        ]
+    )
+    private val deleteRepository = ReposiliteRoute<Unit>("/api/maven-indexer/{repository}/index", Route.DELETE) {
+        managerOnly {
+            println(ctx.path())
+            requireRepository { repository ->
+                response = mavenIndexerFacade.purgeRepository(repository)
+            }
+        }
+    }
+
+    @OpenApi(
+        tags = ["MavenIndexer"],
+        path = "/api/maven-indexer/{repository}/index/<gav>",
+        methods = [HttpMethod.DELETE],
+        pathParams = [
+            OpenApiParam(name = "repository", description = "Destination repository", required = true, allowEmptyValue = true),
+            OpenApiParam(name = "gav", description = "Artifact path qualifier", required = true, allowEmptyValue = true)
+        ],
+        responses = [
+            OpenApiResponse(status = "200", description = "Returns 200 if the request was successful"),
+            OpenApiResponse(status = "403", description = "Returns 403 for invalid credentials"),
+        ]
+    )
+    private val deleteRepositoryGav = ReposiliteRoute<Unit>("/api/maven-indexer/{repository}/index/<gav>", Route.DELETE) {
+        managerOnly {
+            println(ctx.path())
+            requireRepository { repository ->
+                requireGav { gav ->
+                    response = mavenIndexerFacade.purgeRepository(repository, gav)
+                }
+            }
+        }
+    }
+
+    @OpenApi(
+        tags = ["MavenIndexer"],
+        path = "/api/maven-indexer/index-all",
+        methods = [HttpMethod.DELETE],
+        responses = [
+            OpenApiResponse(status = "200", description = "Returns 200 if the request was successful"),
+            OpenApiResponse(status = "403", description = "Returns 403 for invalid credentials"),
+        ]
+    )
+    private val deleteAll = ReposiliteRoute<Unit>("/api/maven-indexer/index-all", Route.DELETE) {
+        managerOnly {
+            response = mavenIndexerFacade.purgeAllRepositories()
+        }
+    }
+
+    @OpenApi(
+        tags = ["MavenIndexer"],
+        path = "/api/maven-indexer/index-all/<gav>",
+        methods = [HttpMethod.DELETE],
+        pathParams = [
+            OpenApiParam(name = "gav", description = "Artifact path qualifier", required = true, allowEmptyValue = true)
+        ],
+        responses = [
+            OpenApiResponse(status = "200", description = "Returns 200 if the request was successful"),
+            OpenApiResponse(status = "403", description = "Returns 403 for invalid credentials"),
+        ]
+    )
+    private val deleteAllGav = ReposiliteRoute<Unit>("/api/maven-indexer/index-all/<gav>", Route.DELETE) {
+        managerOnly {
+            requireGav { gav ->
+                response = mavenIndexerFacade.purgeAllRepositories(gav)
+            }
+        }
+    }
+
     override val routes = routes(
         indexRepository, indexRepositoryGav, indexAll, indexAllGav,
+        deleteRepository, deleteRepositoryGav, deleteAll, deleteAllGav,
     )
 }
 

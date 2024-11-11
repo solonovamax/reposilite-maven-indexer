@@ -24,6 +24,7 @@ import com.reposilite.storage.api.DocumentInfo
 import com.reposilite.storage.api.FileDetails
 import com.reposilite.storage.api.Location
 import com.reposilite.storage.filesystem.FileSystemStorageProvider
+import com.reposilite.storage.inputStream
 import com.reposilite.token.AccessTokenIdentifier
 import io.javalin.http.ContentType
 import io.javalin.http.ContentType.APPLICATION_OCTET_STREAM
@@ -81,6 +82,7 @@ internal class MavenIndexerService(
             scheduledIndexingTask.cancel(false)
 
         scheduler.shutdown()
+        scheduler.awaitTermination(240L, TimeUnit.MINUTES)
         scheduler = components.scheduler()
 
         if (!newSettings.enabled)
@@ -144,29 +146,23 @@ internal class MavenIndexerService(
     }
 
     fun findDetails(lookupRequest: LookupRequest): Result<FileDetails, ErrorResponse> {
-        return mavenFacade.findDetails(lookupRequest).map { it /* typing moment */ }.flatMapErr {
-            resolve(lookupRequest) { repository, gav ->
-                findLocalDetails(repository, gav)
-            }
-        }
+        return resolve(lookupRequest) { repository, gav ->
+            findLocalDetails(repository, gav)
+        }.flatMapErr { mavenFacade.findDetails(lookupRequest) as Result<FileDetails, ErrorResponse> }
     }
 
     fun findFile(lookupRequest: LookupRequest): Result<ResolvedDocument, ErrorResponse> {
-        return mavenFacade.findFile(lookupRequest).flatMapErr {
-            resolve(lookupRequest) { repository, gav ->
+        return resolve(lookupRequest) { repository, gav ->
                 findFile(lookupRequest.accessToken, repository, gav).map { (details, stream) ->
                     ResolvedDocument(document = details, cachable = repository.acceptsCachingOf(gav), content = stream)
                 }
-            }
-        }
+        }.flatMapErr { mavenFacade.findFile(lookupRequest) }
     }
 
     fun findInputStream(lookupRequest: LookupRequest): Result<InputStream, ErrorResponse> {
-        return mavenFacade.findData(lookupRequest).flatMapErr {
-            resolve(lookupRequest) { repository, gav ->
+        return resolve(lookupRequest) { repository, gav ->
                 findInputStream(repository, gav)
-            }
-        }
+        }.flatMapErr { mavenFacade.findData(lookupRequest) }
     }
 
     fun shutdown() {
@@ -246,7 +242,7 @@ internal class MavenIndexerService(
     }
 
     private fun findInputStream(repository: Repository, gav: Location): Result<InputStream, ErrorResponse> {
-        return repository.storageProvider.getFile(gav)
+        return gav.resolveWithRootDirectory(repository).exists().flatMap { resource -> resource.inputStream() }
     }
 
     private fun findLocalDetails(
@@ -256,21 +252,29 @@ internal class MavenIndexerService(
         return getFileDetails(repository, gav).map { it }
     }
 
-    private fun getFileDetails(repository: Repository, location: Location) = location.resolveWithRootDirectory(repository).exists()
-        .flatMap { if (it.exists() && it.isRegularFile()) toDocumentInfo(it) else notFoundError("File not found") }
-
-    private fun Result<Path, ErrorResponse>.exists() = filter({ Files.exists(it) }) { notFound("File not found") }
-
-    private fun Location.resolveWithRootDirectory(repository: Repository): Result<Path, ErrorResponse> {
-        return toPath().map { components.indexPath(repository).resolve(it) }.mapErr { badRequest(it) }
+    private fun getFileDetails(repository: Repository, location: Location): Result<DocumentInfo, ErrorResponse> {
+        return location.resolveWithRootDirectory(repository)
+            .exists()
+            .flatMap {
+                if (it.exists() && it.isRegularFile())
+                    it.toDocumentInfo()
+                else
+                    notFoundError("Cannot find '$location' in maven index")
+            }
     }
 
-    private fun toDocumentInfo(path: Path): Result<DocumentInfo, ErrorResponse> {
-        val attributes = path.readAttributes<BasicFileAttributes>()
-        val contentType = ContentType.getContentTypeByExtension(path.extension) ?: APPLICATION_OCTET_STREAM
+    private fun Result<Path, ErrorResponse>.exists() = filter({ Files.exists(it) }) { notFound("Cannot find '$it' in maven index") }
+
+    private fun Location.resolveWithRootDirectory(repository: Repository): Result<Path, ErrorResponse> {
+        return toPath().map { components.mavenIndexPath(repository).resolve(it) }.mapErr { badRequest(it) }
+    }
+
+    private fun Path.toDocumentInfo(): Result<DocumentInfo, ErrorResponse> {
+        val attributes = readAttributes<BasicFileAttributes>()
+        val contentType = ContentType.getContentTypeByExtension(extension) ?: APPLICATION_OCTET_STREAM
         val lastModified = attributes.lastModifiedTime().toInstant()
 
-        return DocumentInfo(path.name, contentType, attributes.size(), lastModified).asSuccess()
+        return DocumentInfo(name, contentType, attributes.size(), lastModified).asSuccess()
     }
 
     override fun getLogger(): Logger = journalist.logger
