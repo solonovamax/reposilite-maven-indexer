@@ -28,6 +28,7 @@ import com.reposilite.storage.inputStream
 import com.reposilite.token.AccessTokenIdentifier
 import io.javalin.http.ContentType
 import io.javalin.http.ContentType.APPLICATION_OCTET_STREAM
+import kotlinx.datetime.Clock
 import org.apache.lucene.index.MultiBits
 import org.apache.maven.index.ArtifactContext
 import org.apache.maven.index.ArtifactInfo
@@ -282,6 +283,7 @@ internal class MavenIndexerService(
     private inner class ReindexArtifactScanningListener(
         private val context: IndexingContext,
     ) : ArtifactScanningListener {
+        private val startTime = Clock.System.now()
         private val artifactsToProcess = mutableMapOf<String, ArtifactInfo>()
         private val processedUinfos = mutableSetOf<String>()
         private val groupIds = mutableSetOf<String>()
@@ -325,7 +327,8 @@ internal class MavenIndexerService(
         }
 
         override fun artifactDiscovered(artifactContext: ArtifactContext) {
-            logger.debug("MavenIndexerService | discovered artifact {}", artifactContext.artifact?.path)
+            logger.debug("MavenIndexerService | discovered artifact {}", context.gavCalculator.gavToPath(artifactContext.gav))
+
             val artifactInfo = artifactContext.artifactInfo
 
             if (VersionUtils.isSnapshot(artifactInfo.version) && artifactInfo.uinfo in processedUinfos)
@@ -373,7 +376,12 @@ internal class MavenIndexerService(
                 exceptions += e
             }
 
-            logger.debug("MavenIndexerService | Scanning finished, indexed {} files, removed {} stale files", totalFiles, deletedFiles)
+            logger.debug(
+                "MavenIndexerService | Scanning finished, indexed {} files, removed {} stale files in {}",
+                totalFiles,
+                deletedFiles,
+                startTime - Clock.System.now()
+            )
 
             if (exceptions.isNotEmpty()) {
                 logger.error("MavenIndexerService | Scanning produced {} exceptions", exceptions.size)
