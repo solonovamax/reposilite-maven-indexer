@@ -30,6 +30,7 @@ import io.javalin.http.ContentType
 import io.javalin.http.ContentType.APPLICATION_OCTET_STREAM
 import kotlinx.datetime.Clock
 import org.apache.lucene.index.MultiBits
+import org.apache.lucene.search.MatchAllDocsQuery
 import org.apache.maven.index.ArtifactContext
 import org.apache.maven.index.ArtifactInfo
 import org.apache.maven.index.ArtifactScanningListener
@@ -127,10 +128,18 @@ internal class MavenIndexerService(
     }
 
     fun purgeIndex(repository: Repository, startPath: Location = Location.empty()): Result<Unit, ErrorResponse> {
+        val startPath = startPath.toString()
         return repository.executeWithFsStorage { storageProvider ->
             val indexingContext = components.indexingContext(repository, indexer, storageProvider)
             try {
-                indexingContext.purge() // TODO: 2024-11-07 Only purge contents from the startPath
+                indexer.searchIterator(IteratorSearchRequest(MatchAllDocsQuery(), listOf(indexingContext)) { context, other ->
+                    context.gavCalculator.gavToPath(other.calculateGav()).startsWith(startPath)
+                }).asSequence().map { info ->
+                    ArtifactContext(null, null, null, info, info.calculateGav())
+                }.chunked(32).forEach { artifacts ->
+                    indexer.deleteArtifactsFromIndex(artifacts, indexingContext)
+                }
+
                 indexingContext.commit()
             } finally {
                 indexer.closeIndexingContext(indexingContext, true)
@@ -142,7 +151,7 @@ internal class MavenIndexerService(
         TODO("Finish search impl")
     }
 
-    fun contains(searchRequest: MavenIndexerSearchRequest): Result<Unit, ErrorResponse> {
+    fun contains(searchRequest: MavenIndexerSearchRequest): Result<Boolean, ErrorResponse> {
         TODO("Finish search impl")
     }
 
