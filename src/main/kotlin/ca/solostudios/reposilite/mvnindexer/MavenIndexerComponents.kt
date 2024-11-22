@@ -1,6 +1,7 @@
 package ca.solostudios.reposilite.mvnindexer
 
 import ca.solostudios.reposilite.mvnindexer.MavenIndexerSettings.MavenIndexer
+import ca.solostudios.reposilite.mvnindexer.index.creator.MavenExtraArtifactInfoIndexCreator
 import ca.solostudios.reposilite.mvnindexer.infrastructure.MavenIndexerService
 import com.reposilite.Reposilite
 import com.reposilite.journalist.Journalist
@@ -112,20 +113,20 @@ internal class MavenIndexerComponents(
         return Executors.newScheduledThreadPool(maxThreads, NamedThreadFactory("Maven Indexer ($maxThreads) - "))
     }
 
-    private fun indexCreators(indexers: List<MavenIndexer>) = indexers.asSequence().flatMap {
+    private fun indexCreators(indexers: Set<MavenIndexer>) = indexers.asSequence().flatMap {
+        if (it == MavenIndexer.FULL)
+            MavenIndexer.entries - MavenIndexer.FULL
+        else
+            it.dependencies + it
+    }.distinct().flatMap {
         when (it) {
-            MavenIndexer.FULL -> listOf(
-                MinimalArtifactInfoIndexCreator(),
-                JarFileContentsIndexCreator(),
-                MavenArchetypeArtifactInfoIndexCreator(),
-                MavenPluginArtifactInfoIndexCreator(),
-                OsgiArtifactIndexCreator(),
-            )
+            MavenIndexer.FULL        -> error("Should never happen")
             MavenIndexer.MINIMAL         -> listOf(MinimalArtifactInfoIndexCreator())
             MavenIndexer.JAR_CONTENT     -> listOf(JarFileContentsIndexCreator())
             MavenIndexer.MAVEN_ARCHETYPE -> listOf(MavenArchetypeArtifactInfoIndexCreator())
             MavenIndexer.MAVEN_PLUGIN    -> listOf(MavenPluginArtifactInfoIndexCreator())
             MavenIndexer.OSGI_METADATA   -> listOf(OsgiArtifactIndexCreator())
+            MavenIndexer.MAVEN_EXTRA -> listOf(MavenExtraArtifactInfoIndexCreator())
         }
     }.distinctBy { it.id }.toList()
 

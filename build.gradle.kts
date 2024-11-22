@@ -121,8 +121,10 @@ dependencies {
     compileOnly(libs.reposilite)
     reposilite(variantOf(libs.reposilite) { classifier("all") })
 
-    implementation(libs.maven.indexer)
-    implementation(libs.bundles.lucene)
+    api(libs.maven.indexer)
+    api(libs.bundles.lucene)
+
+    implementation("com.soywiz:korlibs-io:6.0.1")
 
     compileOnly(libs.javalin.openapi.plugin)
     kapt(libs.javalin.openapi.processor)
@@ -149,9 +151,7 @@ tasks {
             attributes("Multi-Release" to "true") // lucene breaks without this
         }
 
-        metaInf {
-
-        }
+        minimize()
 
         dependencies {
             exclude(dependency("javax.inject:javax.inject"))

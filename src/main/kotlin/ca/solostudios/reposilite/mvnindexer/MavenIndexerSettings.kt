@@ -77,7 +77,7 @@ public data class MavenIndexerSettings(
             </ul>
         """,
     )
-    val indexers: List<MavenIndexer> = listOf(MavenIndexer.MINIMAL, MavenIndexer.JAR_CONTENT),
+    val indexers: Set<MavenIndexer> = setOf(MavenIndexer.MINIMAL, MavenIndexer.JAR_CONTENT),
     @get:Doc(
         title = "Full Indexing Scan Interval",
         description = """
@@ -118,13 +118,19 @@ public data class MavenIndexerSettings(
     )
     val development: Boolean = false, // TODO: 2024-11-05 Remove
 ) : SharedSettings {
-    public enum class MavenIndexer {
-        JAR_CONTENT,
-        MAVEN_ARCHETYPE,
-        MAVEN_PLUGIN,
+    public enum class MavenIndexer(
+        public val dependencies: List<MavenIndexer>
+    ) {
         MINIMAL,
+        JAR_CONTENT,
         OSGI_METADATA,
-        FULL,
+        MAVEN_ARCHETYPE(MINIMAL),
+        MAVEN_PLUGIN(MINIMAL),
+        MAVEN_EXTRA(MINIMAL),
+        FULL;
+
+        constructor() : this(listOf())
+        constructor(dependency: MavenIndexer) : this(listOf(dependency))
     }
 
     public enum class MavenIndexInterval(public val duration: Duration) {

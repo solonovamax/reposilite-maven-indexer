@@ -104,7 +104,6 @@ internal class MavenIndexerApiEndpoints(
     )
     private val deleteRepository = ReposiliteRoute<Unit>("/api/maven-indexer/{repository}/index", Route.DELETE) {
         managerOnly {
-            println(ctx.path())
             requireRepository { repository ->
                 response = mavenIndexerFacade.purgeRepository(repository)
             }
@@ -126,7 +125,6 @@ internal class MavenIndexerApiEndpoints(
     )
     private val deleteRepositoryGav = ReposiliteRoute<Unit>("/api/maven-indexer/{repository}/index/<gav>", Route.DELETE) {
         managerOnly {
-            println(ctx.path())
             requireRepository { repository ->
                 requireGav { gav ->
                     response = mavenIndexerFacade.purgeRepository(repository, gav)

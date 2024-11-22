@@ -42,7 +42,7 @@ public class MavenIndexerFacade internal constructor(
         return if (rebuild)
             mavenIndexerService.rebuildIndex(repository, startPath)
         else
-            mavenIndexerService.incrementalIndex(repository, startPath)
+            mavenIndexerService.purgeIndex(repository, startPath)
     }
 
     public fun purgeAllRepositories(startPath: Location = Location.empty()): Result<Unit, ErrorResponse> {

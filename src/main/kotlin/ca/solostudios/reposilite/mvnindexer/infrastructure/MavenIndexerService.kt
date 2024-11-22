@@ -130,17 +130,31 @@ internal class MavenIndexerService(
     fun purgeIndex(repository: Repository, startPath: Location = Location.empty()): Result<Unit, ErrorResponse> {
         val startPath = startPath.toString()
         return repository.executeWithFsStorage { storageProvider ->
+            val startTime = Clock.System.now()
+            logger.info("MavenIndexerService | Purging the {} repository", repository.name)
+
             val indexingContext = components.indexingContext(repository, indexer, storageProvider)
             try {
-                indexer.searchIterator(IteratorSearchRequest(MatchAllDocsQuery(), listOf(indexingContext)) { context, other ->
+                logger.debug("MavenIndexerService | Locating artifacts to delete")
+
+                val searchRequest = IteratorSearchRequest(MatchAllDocsQuery(), listOf(indexingContext)) { context, other ->
                     context.gavCalculator.gavToPath(other.calculateGav()).startsWith(startPath)
-                }).asSequence().map { info ->
-                    ArtifactContext(null, null, null, info, info.calculateGav())
-                }.chunked(32).forEach { artifacts ->
-                    indexer.deleteArtifactsFromIndex(artifacts, indexingContext)
                 }
+                val artifacts = indexer.searchIterator(searchRequest).asSequence().map { info ->
+                    ArtifactContext(null, null, null, info, info.calculateGav())
+                }.toList()
+
+                logger.debug("MavenIndexerService | Purging {} artifacts from the {} repository", artifacts.size, repository.name)
+                indexer.deleteArtifactsFromIndex(artifacts, indexingContext)
 
                 indexingContext.commit()
+
+                logger.debug(
+                    "MavenIndexerService | Purged {} artifacts from the {} repository in {}",
+                    artifacts.size,
+                    repository.name,
+                    Clock.System.now() - startTime
+                )
             } finally {
                 indexer.closeIndexingContext(indexingContext, true)
             }
@@ -163,15 +177,15 @@ internal class MavenIndexerService(
 
     fun findFile(lookupRequest: LookupRequest): Result<ResolvedDocument, ErrorResponse> {
         return resolve(lookupRequest) { repository, gav ->
-                findFile(lookupRequest.accessToken, repository, gav).map { (details, stream) ->
-                    ResolvedDocument(document = details, cachable = repository.acceptsCachingOf(gav), content = stream)
-                }
+            findFile(lookupRequest.accessToken, repository, gav).map { (details, stream) ->
+                ResolvedDocument(document = details, cachable = repository.acceptsCachingOf(gav), content = stream)
+            }
         }.flatMapErr { mavenFacade.findFile(lookupRequest) }
     }
 
     fun findInputStream(lookupRequest: LookupRequest): Result<InputStream, ErrorResponse> {
         return resolve(lookupRequest) { repository, gav ->
-                findInputStream(repository, gav)
+            findInputStream(repository, gav)
         }.flatMapErr { mavenFacade.findData(lookupRequest) }
     }
 
@@ -188,9 +202,11 @@ internal class MavenIndexerService(
         else
             scheduler.execute {
                 try {
-                    block(storageProvider)
+                    synchronized(this) {
+                        block(storageProvider)
+                    }
                 } catch (e: Exception) {
-                    failureFacade.throwException("MavenIndexerService | exception while executing scheduled task", e)
+                    failureFacade.throwException("MavenIndexerService | exception while executing scheduled task for repository $name", e)
                 }
             }.asSuccess()
     }
@@ -229,7 +245,7 @@ internal class MavenIndexerService(
 
     private fun <T> resolve(
         lookupRequest: LookupRequest,
-        block: (Repository, Location) -> Result<T, ErrorResponse>
+        block: (Repository, Location) -> Result<T, ErrorResponse>,
     ): Result<T, ErrorResponse> {
         val (accessToken, repositoryName, gav) = lookupRequest
         val repository = mavenFacade.getRepository(repositoryName) ?: return notFoundError("Repository $repositoryName not found")
@@ -243,7 +259,7 @@ internal class MavenIndexerService(
     private fun findFile(
         accessToken: AccessTokenIdentifier?,
         repository: Repository,
-        gav: Location
+        gav: Location,
     ): Result<Pair<DocumentInfo, InputStream>, ErrorResponse> {
         return findLocalDetails(repository, gav)
             .`is`(DocumentInfo::class.java) { notFound("Requested file is a directory") }
@@ -257,7 +273,7 @@ internal class MavenIndexerService(
 
     private fun findLocalDetails(
         repository: Repository,
-        gav: Location
+        gav: Location,
     ): Result<FileDetails, ErrorResponse> {
         return getFileDetails(repository, gav).map { it }
     }
@@ -358,7 +374,7 @@ internal class MavenIndexerService(
 
                 totalFiles += 1
             } catch (e: Exception) {
-                exceptions += e
+                exceptions += IndexingException(message = "exception while indexing $artifactInfo", cause = e)
             }
         }
 
@@ -389,7 +405,7 @@ internal class MavenIndexerService(
                 "MavenIndexerService | Scanning finished, indexed {} files, removed {} stale files in {}",
                 totalFiles,
                 deletedFiles,
-                startTime - Clock.System.now()
+                Clock.System.now() - startTime
             )
 
             if (exceptions.isNotEmpty()) {
@@ -424,4 +440,6 @@ internal class MavenIndexerService(
             }
         }
     }
+
+    internal class IndexingException(message: String? = null, cause: Throwable? = null) : Exception(message, cause)
 }
