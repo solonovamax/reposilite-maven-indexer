@@ -35,7 +35,7 @@ public data class MavenIndexerSettings(
     @get:Doc(
         title = "Index Path",
         description = """
-            The path for the maven index. Defaults to './.maven-index/'.
+            The path for the maven index. Defaults to '.maven-index/'.
         """
     )
     val indexPath: String = ".maven-index/",
@@ -101,7 +101,6 @@ public data class MavenIndexerSettings(
     @Min(min = 1)
     @get:Doc(
         title = "Max Parallel Indexing Repositories",
-        // language=HTML
         description = """
             Maximum number of repositories that can be indexed in parallel.<br>
             This setting only takes effect after a restart.<br>
@@ -109,14 +108,6 @@ public data class MavenIndexerSettings(
         """
     )
     val maxParallelIndexRepositories: Int = 1,
-    @get:Doc(
-        title = "Development",
-        description = """
-            Enables development.<br>
-            This setting is purely for testing and will be removed in the future.
-        """
-    )
-    val development: Boolean = false, // TODO: 2024-11-05 Remove
 ) : SharedSettings {
     public enum class MavenIndexer(
         public val dependencies: List<MavenIndexer>

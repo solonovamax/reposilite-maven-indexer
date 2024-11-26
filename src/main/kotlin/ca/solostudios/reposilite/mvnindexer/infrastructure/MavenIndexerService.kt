@@ -91,8 +91,7 @@ internal class MavenIndexerService(
             return
 
         val durationMillis = newSettings.mavenIndexFullScanInterval.duration.toLong(MILLISECONDS)
-        val initialDelay = if (newSettings.development) 0 else durationMillis // TODO: 2024-11-05 Remove
-        scheduledIndexingTask = scheduler.scheduleAtFixedRate(::incrementalIndex, initialDelay, durationMillis, TimeUnit.MILLISECONDS)
+        scheduledIndexingTask = scheduler.scheduleAtFixedRate(::incrementalIndex, durationMillis, durationMillis, TimeUnit.MILLISECONDS)
     }
 
     fun incrementalIndex(startPath: Location = Location.empty()): Result<Unit, ErrorResponse> {
